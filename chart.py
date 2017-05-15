@@ -95,7 +95,7 @@ def main(params):
     parser.add_argument('--lat', type=float, default=0, help='Latitude for center of the chart. Must also use --utc to specify time')
     parser.add_argument('--lon', type=float, default=0, help='Longitude for center of the chart. Must also use --utc to sepcify time')
     
-    parser.add_argument('-c', '--catalogue', default='data/tycho2_abbr_new.dat', help='catalogue to use for the query')
+    parser.add_argument('-c', '--catalogue', default='data/eye_visible.dat', help='catalogue to use for the query')
     parser.add_argument('-L', '--labels', action='store_false', default=True, help='dont draw labels on objects')
     parser.add_argument('-G', '--grid', action='store_false', default=True, help='dont draw coordinate grid')
     parser.add_argument('-B', '--borders', action='store_false', default=True, help='dont draw constellation border lines')
