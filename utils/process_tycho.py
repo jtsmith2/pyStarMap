@@ -2,13 +2,13 @@ import math
 
 ref = dict()
 def main():
-    tycho = open('tycho2_stripped.dat')
+    tycho = open('tycho2.dat')
     suppl = open('suppl_1.dat')
 
-    xref = open('xref.dat')
+    xref = open('xref.csv')
 
     for line in xref:
-        data = line.strip().split('|')
+        data = line.strip().split(',')
         #print '"%s" %s' % (data[0], str(data))
         ref[str(data[0])] = data
     

@@ -1,12 +1,10 @@
 # chart.py
 
-Python program to generate star charts. Currently supports creating charts in the following projections:
-* stereographic - for generating atlas style maps covering large areas of sky.
-* gnomonic - for generating field of view type charts useful as finder charts.
-* polar - for generating a polar view.
+Python program to generate star charts. Originally forked from <https://github.com/potzie/starchart>.
 
-see `generate_charts.bat` for sample script to generate low res 'index' charts and high res
-starmaps.
+Program takes a latitude, longitude, and UTC timestamp and returns a .png star map of the sky at that date/time.
+
+See `generate_charts.bat` for samples.
 
 The program uses data from the Tycho2 catalogue: http://cdsarc.u-strasbg.fr/viz-bin/Cat?I/259 and 
 the Revised New General Catalogue: http://www.klima-luft.de/steinicke/ngcic/rev2000/Explan.htm.

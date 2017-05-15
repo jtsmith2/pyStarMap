@@ -6,7 +6,8 @@ import re
 import sys
 import argparse
 import math
-from decimal import Decimal 
+from decimal import Decimal
+from datetime import datetime
 
 args = None
 
@@ -27,7 +28,7 @@ DES = 12
 VMAG = 13
 PROX = 14
 
-TYCHO_ROWS = 2557500
+TYCHO_ROWS = 2557501
 NGC_ROWS = 14002
 
 alp = re.compile(r'.*Alp')
@@ -60,13 +61,15 @@ fifteen = float(15)
 scale = float('.75')
 cmax = 0.0;
 
-gainsboro = (220,220,220,255)
-gray = (128,128,128,255)
-white = 'white'
-black = 'black'
-red = 'red'
-lightblue = (173, 216, 230, 255)
-lightgreen = (144, 238, 144, 255)
+star_color = 'white'
+line_color = 'white'
+ecliptic_color = 'white'
+background_color = (57, 70, 87, 255)
+text_color = 'white'
+border_color = 'white'
+figure_color = 'white'
+
+line_width = 2
     
 rads = float(math.pi / 180)
 
@@ -83,25 +86,28 @@ def main(params):
     global cmax
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--type', choices=['stereo', 'polar', 'gnomonic'], default='stereo', help='type of projection to use for the chart')
-    parser.add_argument('-r', '--ra', type=float, default=6, help='center of the chart in right ascension')
-    parser.add_argument('-d', '--dec', type=float, default=0, help='center of the chart in declination')
-    parser.add_argument('-f', '--fov', type=float, default=5, help='fov for gnomonic projection')
+    parser.add_argument('-t', '--type', choices=['stereo'], default='stereo', help='type of projection to use for the chart')
     
-    parser.add_argument('-m', '--mag', type=float, default=9, help='lowest magnitude stars to chart')
-    parser.add_argument('-l', '--labelLimit', type=Decimal, default=6, help='only display labels on stars brighter than this')
+    parser.add_argument('-m', '--mag', type=float, default=6, help='lowest magnitude stars to chart')
+    parser.add_argument('-l', '--labelLimit', type=Decimal, default=3, help='only display labels on stars brighter than this')
+
+    parser.add_argument('-u', '--utc', type=parse_time, default=parse_time('2000-1-1 0:0:0'), help='UTC time for star chart')
+    parser.add_argument('--lat', type=float, default=0, help='Latitude for center of the chart. Must also use --utc to specify time')
+    parser.add_argument('--lon', type=float, default=0, help='Longitude for center of the chart. Must also use --utc to sepcify time')
     
-    parser.add_argument('-c', '--catalogue', default='data/tycho2_abbr_new2.dat', help='catalogue to use for the query')
-    parser.add_argument('-L', '--labels', action='store_false', default=True, help='draw labels on objects')
-    parser.add_argument('-G', '--grid', action='store_false', default=True, help='draw coordinate grid')
-    parser.add_argument('-B', '--borders', action='store_false', default=True, help='draw constellation border lines')
-    parser.add_argument('--figures', action='store_false', default=True, help='draw constellation figures')
-    parser.add_argument('-N', '--names', action='store_false', default= True, help='draw constellation names')
+    parser.add_argument('-c', '--catalogue', default='data/tycho2_abbr_new.dat', help='catalogue to use for the query')
+    parser.add_argument('-L', '--labels', action='store_false', default=True, help='dont draw labels on objects')
+    parser.add_argument('-G', '--grid', action='store_false', default=True, help='dont draw coordinate grid')
+    parser.add_argument('-B', '--borders', action='store_false', default=True, help='dont draw constellation border lines')
+    parser.add_argument('--figures', action='store_false', default=True, help='dont draw constellation figures')
+    parser.add_argument('-N', '--names', action='store_false', default= True, help='dont draw constellation names')
+    parser.add_argument('--draw_ngc', action='store_false', default=True, help='dont draw ngc objects')
+    parser.add_argument('-e', '--ecliptic', action='store_false', default=True, help='dont draw ecliptic line')
     
     parser.add_argument('-W', '--width', type=float, default=a4_width, help='width of the chart')
     parser.add_argument('-H', '--height', type=float, default=a4_height, help='height of the chart')
     parser.add_argument('-S', '--scaleR', type=float, default=1, help='scale factor for objects')
-    parser.add_argument('-F', '--factor', type=float, default=3, help='size multiplier for drawing chart')
+    parser.add_argument('-F', '--factor', type=float, default=1, help='size multiplier for drawing chart')
     
     parser.add_argument('-q', '--query', default=None, help='query the data files')
     parser.add_argument('-p', '--process', default=False, action='store_true', help='quit query on first result')
@@ -117,7 +123,7 @@ def main(params):
     parser.add_argument('--hip_font', type=int, default=12, help='size of font used for hipparchos ids')
     parser.add_argument('--ngc_font', type=int, default=12, help='size of font used for ngc object labels')
     
-    parser.add_argument('--out', type=argparse.FileType('wb'), default=None, help='filename for output')
+    parser.add_argument('--out', type=argparse.FileType('wb'), default='output.png', help='filename for output')
     
     global args, times, arial, arial_small, con_font
     
@@ -155,7 +161,10 @@ def main(params):
         image.save(args.out, 'PNG')
     else:
         return image
-    
+
+
+def parse_time(dt):
+    return datetime.strptime(dt,'%Y-%m-%d %H:%M:%S')
     
 def run_query(args):
     results = query(args)
@@ -252,6 +261,7 @@ def get_stars(args):
     
     for row in data:
         raw = row.strip().split('|')
+		#print line_no
         star = parse_star(raw, args)
         if star:
             stars.append(star)
@@ -262,18 +272,20 @@ def get_stars(args):
     return stars
     
 def parse_star(row, args):
-    #try:
-    if not float(row[VMAG]) <= args.mag:
+    try:
+        #print row[VMAG]
+        if not float(row[VMAG]) <= args.mag:
+            return None
+    except:
+        #console('error on line: %s' % (row))
         return None
-    #except:
-    #    console('error on line: %s' % (row))
-    #    return None
         
     point = get_point(row, args)
     if point:
         id = row[NAME]
         name = ''
         mag = float(row[VMAG])
+        con = ''
         font = times
         if args.labels:
             if id != None:
@@ -320,7 +332,7 @@ def get_figures():
     lines = list()
     for line in data:
         cols = line.lstrip().split(',')
-        row = {'con': cols[0], 'startRa': float(cols[1])/1000, 'startDec': float(cols[2])/100, 'endRa': float(cols[3])/1000, 'endDec': float(cols[4])/100}
+        row = {'con': cols[0], 'startRa': float(cols[1]), 'startDec': float(cols[2]), 'endRa': float(cols[3]), 'endDec': float(cols[4])}
         lines.append(row)
     return lines
     
@@ -334,12 +346,11 @@ def get_names():
     return names
     
 def draw(data, ngc, args):
-    image = Image.new('RGBA', (math.trunc(args.width * args.factor), math.trunc(args.height * args.factor)), white)
+    image = Image.new('RGBA', (math.trunc(args.width * args.factor), math.trunc(args.height * args.factor)), background_color)
     
     chart = ImageDraw.Draw(image)
     w,h = image.size
     rectangle = (0,0,w-1,h-1)
-    chart.rectangle(rectangle, outline="gray")
     
     if args.grid:
         console('plotting dec lines...')
@@ -356,25 +367,20 @@ def draw(data, ngc, args):
         console('plotting constellation figures...')
         drawFigures(chart, args)
     
-    drawEcliptic(chart, args)
+    if args.ecliptic:
+        console('plotting ecliptic')
+        drawEcliptic(chart, args)
     
     if args.names:
         console('plotting constellation names...')
         drawNames(chart, args)
-        
-    console('plotting ngc objects...')
-    drawNgc(chart, ngc, args)
+
+    if args.draw_ngc:    
+        console('plotting ngc objects...')
+        drawNgc(chart, ngc, args)
         
     console('plotting star positions...')
     drawStars(chart, data, args)
-        
-    if args.type == 'polar':
-        point = get_coords(args.ra - 12, args.dec - 1, args, False)
-        point2 = get_coords(args.ra, args.dec -1, args, False)
-        chart.line([(point['x'], point['y']), (point['x'], point2['y'])], fill=gray)
-        point = get_coords(args.ra - 6, args.dec - 1, args, False)
-        point2 = get_coords(args.ra + 6, args.dec -1, args, False)
-        chart.line([(point['x'], point['y']), (point2['x'], point['y'])], fill=gray)
     
     if args.labels:
         drawLabels(chart, image, ngc, data, args)
@@ -394,7 +400,7 @@ def drawNgc(chart, ngc, args):
             x1 = point['x'] + 10 * args.scaleR 
             y1 = point['y'] + 5 * args.scaleR
             
-            chart.ellipse((x, y, x1, y1), outline=black)
+            chart.ellipse((x, y, x1, y1), outline=star_color)
         counter += 1
         progress(counter, len(ngc))
     console('drew %s ngc objects' % (ngccount))
@@ -410,12 +416,12 @@ def drawStars(chart, data, args):
         x1 = point['x'] + m * args.scaleR 
         y1 = point['y'] + m * args.scaleR
         
-        chart.ellipse((x, y, x1, y1), fill=black)
-        chart.ellipse((x, y, x1, y1), outline=white)
+        chart.ellipse((x, y, x1, y1), fill=star_color)
+        chart.ellipse((x, y, x1, y1), outline=star_color)
         prox = row['prox']
         if prox != '999' and m > 1:
             cy = y + ((y1 - y) / 2)
-            chart.line((x - 1, cy, x1 + 1, cy), fill=black)
+            chart.line((x - 1, cy, x1 + 1, cy), fill=star_color)
         counter += 1
         progress(counter, len(data))
         
@@ -431,7 +437,7 @@ def drawLabels(chart, image, ngc, data, args):
             r = float(calc_rad(row['mag'])) * args.scaleR
             point = find_free(point, name, font_family, image, r, row['hip'])
             if point:
-                chart.text((point['x'], point['y']), name, font=font_family, fill=black)
+                chart.text((point['x'], point['y']), name, font=font_family, fill=text_color)
         counter += 1
         progress(counter, len(data))
     
@@ -445,7 +451,7 @@ def drawLabels(chart, image, ngc, data, args):
             if name != '':
                 point = find_free(point, name, font_family, image, 10 * args.scaleR, '')
                 if point:
-                    chart.text((point['x'], point['y']), name, font=font_family, fill=black)
+                    chart.text((point['x'], point['y']), name, font=font_family, fill=text_color)
         counter += 1
         progress(counter, len(ngc))
         
@@ -456,20 +462,22 @@ def drawEcliptic(chart, args):
     for d in range(0, 360):
         i = float(d) / 15
         delta = math.asin(sineps * math.sin(i*rads*15))*(180/math.pi)
+        #print "Ecliptic:",i,delta
         point = get_coords(i, delta, args)
         if point:
+            #print point
             m = 3
             x = point['x'] - m * args.scaleR
             y = point['y'] - m * args.scaleR
             x1 = point['x'] + m * args.scaleR 
             y1 = point['y'] + m * args.scaleR
             
-            chart.ellipse((x, y, x1, y1), fill=red)
+            chart.ellipse((x, y, x1, y1), fill=ecliptic_color)
             
             if prev:
-                chart.line([(point['x'], point['y']), (prev['x'], prev['y'])], fill=red)
+                chart.line([(point['x'], point['y']), (prev['x'], prev['y'])], fill=ecliptic_color, width=line_width)
             
-            prev = point
+        prev = point
         
             
     
@@ -484,7 +492,7 @@ def drawBorders(draw, args):
         
         if coords and prev:
             if row['con'] == current:
-                draw.line([(prev['x'], prev['y']), (coords['x'], coords['y'])], fill=lightblue)
+                draw.line([(prev['x'], prev['y']), (coords['x'], coords['y'])], fill=border_color, width=line_width)
             
         current = row['con']
         prev = coords
@@ -500,7 +508,7 @@ def drawFigures(draw, args):
         if start != None:
             end = get_coords(row['endRa'], row['endDec'], args, False)
             if end != None:
-                draw.line([(start['x'], start['y']), (end['x'], end['y'])], fill=lightgreen)
+                draw.line([(start['x'], start['y']), (end['x'], end['y'])], fill=figure_color, width=line_width)
         count += 1
         progress(count, len(lines))
 
@@ -530,7 +538,7 @@ def drawNames(draw, args):
     for name in names:
         coords = get_coords(name['ra'], name['dec'], args)
         if coords:
-            draw.text((coords['x'], coords['y']), name['name'], font=con_font, fill=lightblue)
+            draw.text((coords['x'], coords['y']), name['name'], font=con_font, fill=text_color)
         count += 1
         progress(count, len(names))
 
@@ -541,28 +549,9 @@ def drawDeclinationLines(draw, args):
     label_step = 12
     dec = Decimal(-90)
     end = Decimal(90)
+    ra = 0
+    endra = 24
     step = Decimal(10)
-    if args.type == 'stereo':
-        dec = Decimal(-60)
-        end = Decimal(61)
-        ra = args.ra - 3
-        endra = args.ra + 3
-    elif args.type == 'gnomonic':
-        console('%s' % (args.dec))
-        dec = math.trunc(args.dec - 20)
-        end = math.trunc(args.dec + 20)
-        ra = args.ra - 1
-        endra = args.ra + 1
-        label_step = 12
-    elif args.type == 'polar':
-        if args.dec == 90:
-            dec = 50
-            end = 81
-        elif args.dec == -90:
-            dec = -80
-            end = -49
-        ra = 0
-        endra = 24
     count = end - dec
     
     #console('%s %s %s %s' % (dec, end, ra, endra))
@@ -578,13 +567,13 @@ def drawDeclinationLines(draw, args):
             #console("ra: %s dec: %s                      %s" % (ra, de, ONE_TWELFTH))
             point = get_coords(r, de, args, False)
             if point and prev:
-                draw.line([(prev['x'], prev['y']), (point['x'], point['y'])], fill=gray)
-                
+                draw.line([(prev['x'], prev['y']), (point['x'], point['y'])], fill=line_color)
             
-            if ctr % label_step == 0:
-                rh = round(r, 0)
-                #rm = round(60 * (r - math.trunc(r)))
-                draw.text((point['x'] - 20, point['y'] - 15), u'%sh' % (rh), font=arial, fill=gray)
+                if ctr % label_step == 0:
+                    rh = round(r, 0)
+                    #rm = round(60 * (r - math.trunc(r)))
+                    draw.text((point['x'] - 20, point['y'] - 15), u'%sh' % (rh), font=arial, fill=line_color, width=line_width)
+
             r += float(ONE_TWELFTH)
             ctr += 1
             prev = point
@@ -598,7 +587,7 @@ def drawDeclinationLines(draw, args):
             point = get_coords(r - .025, de, args, False)
             point2 = get_coords(r + .025, de, args, False)
             if point and point2 and prev:
-                draw.line([(point['x'], point['y']), (point2['x'], point2['y'])], fill=gray)
+                draw.line([(point['x'], point['y']), (point2['x'], point2['y'])], fill=line_color, width=line_width)
                 
             prev = point2
             r += 1
@@ -614,25 +603,8 @@ def drawRaLines(draw, args):
     end = Decimal(24)
     step = Decimal('0.2')
     label_step = 10
-    
-    if args.type == 'stereo':
-        ra = Decimal(args.ra - 3)
-        end = Decimal(args.ra + 3)
-        sdec = Decimal(-60)
-        edec = Decimal(61)
-    elif args.type == 'gnomonic':
-        ra = Decimal(args.ra - 1)
-        end = Decimal(args.ra + 1)
-        sdec = Decimal(args.dec - 20)
-        edec = Decimal(args.dec + 20)
-        label_step = 1
-    elif args.type == 'polar':
-        if args.dec == 90:
-            sdec = Decimal(50)
-            edec = Decimal(81)
-        elif args.dec == -90:
-            sdec = Decimal(-80)
-            edec = Decimal(-49)
+    sdec = -80
+    edec = 81
     
     count = end - ra
     r = ra
@@ -642,11 +614,11 @@ def drawRaLines(draw, args):
         for de in range(sdec, edec, 1):
             point = get_coords(float(r), float(de), args, False)
             if point and prev:
-                draw.line([(prev['x'], prev['y']), (point['x'], point['y'])], fill=gray)
+                draw.line([(prev['x'], prev['y']), (point['x'], point['y'])], fill=line_color, width=line_width)
                 if de % label_step == 0:
                     rh = math.trunc(r)
                     rm = math.trunc(60 * (r - math.trunc(r)))
-                    draw.text((point['x'] + 10, point['y'] + 10), u'%s\u00b0' % (de), font=arial, fill=gray)
+                    draw.text((point['x'] + 10, point['y'] + 10), u'%s\u00b0' % (de), font=arial, fill=line_color, width=line_width)
             prev = point
         counter += 1
         r += Decimal(1)
@@ -660,7 +632,7 @@ def drawRaLines(draw, args):
             point = get_coords(float(r), float(de - step), args, False)
             point2 = get_coords(float(r), float(de + step), args, False)
             if point and point2:
-                draw.line([(point['x'], point['y']), (point2['x'], point2['y'])], fill=gray)
+                draw.line([(point['x'], point['y']), (point2['x'], point2['y'])], fill=line_color, width=line_width)
             #prev = point2
         counter += 1
         r += ONE_TWELFTH
@@ -673,65 +645,31 @@ def get_coords(ra, dec, args, filter=True):
     #point = globals()[args.type](ra, dec, args.ra, args.dec, filter)
     point = None
     if (args.type == 'stereo'):
-        point = stereo(ra, dec, args.ra, args.dec, filter)
-    elif (args.type == 'gnomonic'):
-        point = gnomonic(ra, dec, args.ra, args.dec, filter)
-    elif (args.type == 'polar'):
-        point = polar(ra, dec, args.ra, args.dec, filter)
+        point = stereo(ra, dec, args.lat, args.lon, args.utc)
     if point != None:
+        #print point
         transform(point, args)
     return point
-    
-def stereo(r, d, ra, dec, filter):
-    if filter and (r > ra + 3 or r < ra - 3 or d > 60 or d < -60):
-        return None
-        
-    r = r - ra
-    
-    r_rads = r * rads * fifteen
-    d_rads = d * rads
-    
-    x = float(math.cos(d_rads) * math.sin(r_rads))
-    y = float(math.sin(d_rads))
-    z = float(math.cos(r_rads) * math.cos(d_rads))
-    
-    X1 = float(-1 * x / (1 + z))
-    Y1 = float(-1 * y / (1 + z))
-        
-    return {'x': X1, 'y': Y1}
-    
-def polar(ra, dec, base_ra, base_dec, filter):
-    if filter:
-        if (base_dec == 90 and dec < 50) or (base_dec == -90 and dec > -50):
-            return None
-        
-    r = float(ra) * rads * 15
-    d = (base_dec - float(dec)) * rads
-    
-    x1 = d * float(math.cos(r))
-    y1 = d * float(math.sin(r))
-    
-    return {'x': x1, 'y': y1}
 
-def gnomonic(ra, dec, base_ra, base_dec, filter):
-    #inside = ra < base_ra + cmax and ra > base_ra - cmax and dec > base_dec - args.fov and dec < base_dec + args.fov
-    #if filter and not inside:
-    #    return None
-        
-    lam = ra * 15 * rads
-    chi = dec * rads
-    lam0 = base_ra * 15 * rads
     
-    chi1 = base_dec * rads
-    c = float(math.sin(chi) * math.sin(chi1) + math.cos(chi) * math.cos(chi1) * math.cos(lam - lam0))
-    
-    if filter and c < cmax:
+def stereo(ra, dec, lat, lon, utc):
+    mst = mean_sidereal_time(utc, lon)
+
+    az, ele = coord_to_horizon(mst, ra, dec, lat)
+    #print az, ele
+
+    if ele < 0:
         return None
+
+    r = (90 - ele)/90.0
+    theta = (450 - az)%360
+
+    X1 = r * math.cos(theta*rads)
+    Y1 = r * math.sin(theta*rads)
+    #print X1, Y1
         
-    x1 = math.cos(chi) * math.sin(lam - lam0) / math.cos(c * rads)
-    y1 = ((math.cos(chi1) * math.sin(chi)) - (math.sin(chi1) * math.cos(chi) * math.cos(lam - lam0))) / math.cos(c * rads)
+    return {'x': -X1, 'y': -Y1}
     
-    return {'x': -1 * x1, 'y': -1 * y1}
     
 def transform(point, args):
     globals()['transform_' + args.type](point, args)
@@ -740,25 +678,8 @@ def transform_stereo(point, args):
     x = point['x']
     y = point['y']
     
-    point['x'] = (x * args.width * args.factor) + (args.width * args.factor / 2)
-    point['y'] = (y * args.width * args.factor) + (args.height * args.factor / 2)
-    
-def transform_polar(point, args):
-    x = point['x']
-    y = point['y']
-    
-    point['x'] = (x * args.width / float(2) * args.factor) + (args.width * args.factor / 2)
-    point['y'] = (y * args.width / float(2) * args.factor) + (args.height * args.factor / 2)
-    
-def transform_gnomonic(point, args):
-    x = point['x']
-    y = point['y']
-    
-    #scale = .75 * args.width * args.factor / (args.fov * rads / 2)
-    scale =  cmax * args.factor * args.width / (args.fov * rads)
-    
-    point['x'] = (x * scale) + (args.width * args.factor / 2)
-    point['y'] = (y * scale) + (args.width * args.factor / 2)
+    point['x'] = (x * args.width * args.factor / 2) + (args.width * args.factor / 2)
+    point['y'] = (y * args.width * args.factor / 2) + (args.height * args.factor / 2)
     
     
 def find_free(point, text, font, image, r, hip):
@@ -916,7 +837,66 @@ def ngc_dec(hem, d, m, s):
         return deg + min + sec
 
 
+def mean_sidereal_time(utc, lon):
+    year = utc.year
+    month = utc.month
+    
+    if month == 1 or month == 2:
+        year -= 1
+        month += 12
         
+    a = math.floor(year/100)
+    b = 2 - a + math.floor(a/4)
+    c = math.floor(365.25*year)
+    d = math.floor(30.6001*(month+1))
+
+    #days since J2000.0
+    jd = b + c + d - 730550.5 + utc.day + (utc.hour + utc.minute/60.0 + utc.second/3600.0)/24.0
+
+    #julian centuries since J2000.0
+    jt = jd/36525.0
+
+    #the mean sidereal time in degrees
+    mst = 280.46061837 + 360.98564736629*jd + 0.000387933*jt*jt - jt*jt*jt/38710000 + lon
+
+    #mod 360
+    mst = mst % 360.0
+
+    return mst
+    
+    
+
+def coord_to_horizon (mst, ra, dec, lat):
+    #convert ra to degrees from hours
+    ra = ra*15
+    
+    #compute hour angle in degrees
+    ha = mst - ra
+    if (ha < 0):
+        ha += 360
+
+    #convert degrees to radians
+    ha = ha * math.pi / 180
+    dec = dec * math.pi / 180
+    lat = lat * math.pi / 180
+
+    #compute elevation in radians
+    sin_ele = math.sin(dec) * math.sin(lat) + math.cos(dec) * math.cos(lat) * math.cos(ha)
+    ele = math.asin(sin_ele)
+
+    #compute azimuth in radians
+    cos_az = (math.sin(dec) - math.sin(ele) * math.sin(lat)) / (math.cos(ele) * math.cos(lat))
+    az = math.acos(cos_az)
+
+    #convert from radians to degrees
+    elevation = ele * 180 / math.pi
+    azimuth = az * 180 / math.pi
+
+    #choose hemisphere
+    if math.sin(ha) > 0:
+        azimuth = 360 - azimuth
+
+    return (azimuth, elevation)
 
 if __name__ == '__main__':
     if sys.platform == "win32":
